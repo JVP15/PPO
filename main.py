@@ -1,10 +1,25 @@
 import gym
-import torch
+import numpy as np
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+from PPO import PPOAgent
 
-# env = gym.make('Pendulum-v1-custom')
-env = gym.make('Pendulum-v1')
+# If you haven't registered the custom environment (like me), set this to False. If it's false, the environment will be
+#   set to Pendulum-v1, which I think is similar to the custom pendulum environment except its state space is
+#   [cos(theta), sin(theta), theta_dot] instead of [theta, theta_dot].
+# The state_helper functon will automatically take care of this though
+
+USING_CUSTOM_ENVIRONMENT = False
+
+def state_helper(state):
+    if USING_CUSTOM_ENVIRONMENT:
+        return state
+    else:
+        # state is [cos(theta), sin(theta), theta_dot], we want [theta, theta_dot]
+        return [np.arccos(state[0]), state[2]]
+
+env_name = 'Pendulum-v1-custom' if USING_CUSTOM_ENVIRONMENT else 'Pendulum-v1'
+
+env = gym.make(env_name)
 
 # sample hyperparameters
 train_iterations = 10000
@@ -14,17 +29,20 @@ learning_rate = 1e-2
 hidden_size = 8
 n_layers = 2
 
-print(env.action_space)
+agent = PPOAgent(input_size=2, output_size=1, log_std=-.5)
 
-# get first observation of the environment
-obs = env.reset()
+# get first observation of the environment and make sure the state is in the correct format
+state = state_helper(env.reset())
 
 for _ in range(train_iterations):
     # select action
-    action = env.action_space.sample()
+    action = agent.action(state)
 
     # take action and get next observation, reward, done
-    obs, reward, done, _ = env.step(action)
+    state, reward, done, _ = env.step(action)
+
+    # if we're using a custom environment, we need to convert the state to [theta, theta_dot]
+    state = state_helper(state)
 
     # render environment
     env.render()
