@@ -1,25 +1,23 @@
 import gym
 import numpy as np
+from a3_gym_env.envs.pendulum import CustomPendulumEnv
 
 from PPO import PPOAgent
 
-# If you haven't registered the custom environment (like me), set this to False. If it's false, the environment will be
-#   set to Pendulum-v1, which I think is similar to the custom pendulum environment except its state space is
-#   [cos(theta), sin(theta), theta_dot] instead of [theta, theta_dot].
-# The state_helper functon will automatically take care of this though
+# Set USING_CUSTOM_ENVIRONMENT to True if you want to use the environment provided by the professor, and False
+#   if you want to use Pendulum-v1 from OpenAI Gym. I think the only difference is that Pendulum-v1 stops after 200 timesteps
+#   while the environment provided by the professor does not have a limit.
 
 USING_CUSTOM_ENVIRONMENT = False
 
 def state_helper(state):
-    if USING_CUSTOM_ENVIRONMENT:
-        return state
-    else:
-        # state is [cos(theta), sin(theta), theta_dot], we want [theta, theta_dot]
-        return [np.arccos(state[0]), state[2]]
+    # state is [cos(theta), sin(theta), theta_dot], we want [theta, theta_dot]
+    return [np.arctan2(state[1], state[0]), state[2]]
 
-env_name = 'Pendulum-v1-custom' if USING_CUSTOM_ENVIRONMENT else 'Pendulum-v1'
-
-env = gym.make(env_name)
+if USING_CUSTOM_ENVIRONMENT:
+    env = CustomPendulumEnv()
+else:
+    env = gym.make('Pendulum-v1')
 
 # sample hyperparameters
 train_iterations = 10000
