@@ -9,7 +9,7 @@ class PPOAgent(object):
     def __init__(self, input_size, output_size,
                  log_std=.01,
                  num_trajectories=32,
-                 trajectory_length=5,
+                 trajectory_length=100,
                  n_epochs=10,
                  learning_rate=3e-4,
                  gamma=.99,
@@ -47,23 +47,22 @@ class PPOAgent(object):
             # gradient tape allows us to perform automatic differentiation
             with tf.GradientTape(persistent=True) as tape:
                 loss = self._loss_function(trajectories, policy_func=self.pi, value_func=self.V, gamma=self._gamma)
-                print(f'loss = {loss}')
+
             # compute the gradients of the loss with respect to the policy and value parameters
-            gradients = tape.gradient(loss, self._mu.trainable_variables + self._value.trainable_variables)
+            # if you aren't using the value function, then we ignore the gradient of the value function using the 'unconnected_gradients' argument
+            gradients = tape.gradient(loss, self._mu.trainable_variables + self._value.trainable_variables,
+                                      unconnected_gradients=tf.UnconnectedGradients.ZERO)
+
             optimizer.apply_gradients(zip(gradients, self._mu.trainable_variables + self._value.trainable_variables))
 
             if iteration % log_interval == 0:
                 print("iteration: {}, loss: {}".format(iteration, loss))
 
-    # use @tf.function to make this a tensorflow function so that it can be differentiated by tf.GradientTape
-    @tf.function
     def mu(self, state):
         # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
         state = tf.expand_dims(state, axis=0)
         return self._mu(state)
 
-    # use @tf.function to make this a tensorflow function so that it can be differentiated by tf.GradientTape
-    @tf.function
     def V(self, state):
         # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
         state = tf.expand_dims(state, axis=0)
@@ -74,8 +73,6 @@ class PPOAgent(object):
         #  I've added this function to future-proof the code.
         return np.exp(self._log_std)
 
-    # use @tf.function to make this a tensorflow function so that it can be differentiated by tf.GradientTape
-    @tf.function
     def pi(self, action, state):
         """This is the policy pi(a|s), which computes the probability that the agent will take action a given the state s.
         """
@@ -103,7 +100,7 @@ class PPOAgent(object):
 
         # collect all trajectories for the current iteration
         for _ in range(self._num_trajectories):
-            print(f'Collecting trajectory {_}')
+            #print(f'Collecting trajectory {_}')
             # collect data from a single trajectory/episode
             trajectory = []
 
@@ -122,6 +119,6 @@ class PPOAgent(object):
                 state = next_state
 
             trajectories.append(trajectory)
-        print(trajectories[0][1])
+        #print(trajectories[0][1])
 
         return trajectories

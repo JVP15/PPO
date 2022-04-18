@@ -31,14 +31,12 @@ def reward_to_go(trajectory, time, gamma):
 
     # loop over the trajectory from the given time until the end
     for count, timestep in enumerate(trajectory[time:]):
-        print(timestep[0], '\n', timestep[1],'\n', timestep[2], '\n')
+        #print(timestep[0], '\n', timestep[1],'\n', timestep[2], '\n')
         reward += timestep[2] * (gamma ** count)
 
     #print('reward to go =', reward)
     return reward
 
-# use @tf.function to make this a tensorflow function so that it can be differentiated by tf.GradientTape
-@tf.function
 def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
     """
     Computes the loss for the policy gradient algorithm with reward-to-go instead of an advantage function.
@@ -56,7 +54,7 @@ def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
     # loop over all trajectories in the batch
     for trajectory in trajectories:
         # loop over all timesteps in the trajectory and compute the loss for each timestep
-        print('trajectory =', trajectory)
+        #print('trajectory =', trajectory)
         for time, timestep in enumerate(trajectory):
             # calculate the reward to go for this timestep
             reward = reward_to_go(trajectory, time, gamma)
