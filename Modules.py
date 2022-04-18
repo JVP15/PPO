@@ -17,18 +17,56 @@ class NormalModule(nn.Module):
         return mout, vout
 
 
-# this is the loss function for policy gradient
+def reward_to_go(trajectory, time, gamma):
+    """
+    This calculates the reward to go for the given trajectory (a list of (s, a, r) tuples) starting at the given time
+    Equivalent to R_to_go = sum t=t` to T (gamma^(t-t`) * r_t)
+
+    :param trajectory: A list of (s, a, r) tuples
+    :param time: The time to start calculating the reward from
+    :param gamma: The discount factor
+    :return: The reward to go
+    """
+    reward = 0
+
+    # loop over the trajectory from the given time until the end
+    for count, timestep in enumerate(trajectory[time:]):
+        print(timestep[0], '\n', timestep[1],'\n', timestep[2], '\n')
+        reward += timestep[2] * (gamma ** count)
+
+    #print('reward to go =', reward)
+    return reward
+
 # use @tf.function to make this a tensorflow function so that it can be differentiated by tf.GradientTape
 @tf.function
-def policy_gradient_loss(trajectories, policy_func, value_func, gamma=0.99):
+def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
     """
-    Computes the loss for the policy gradient algorithm.
+    Computes the loss for the policy gradient algorithm with reward-to-go instead of an advantage function.
+    Loss = E[log(pi(a|s)) * (R_to_go)]
+
     :param trajectories: A list of trajectories, where each element of each trajectory is (s, a, r)
-    :param policy: The policy function pi(a|s).
-    :param value: The value function V(s).
+    :param policy_func: The policy function pi(a|s).
+    :param value_func: The value function V(s) (not actually used in this function, but here to match the signature)
     :param gamma: The discount factor.
     :return: The loss for the policy gradient algorithm.
     """
 
-    pass
+    loss = 0
+
+    # loop over all trajectories in the batch
+    for trajectory in trajectories:
+        # loop over all timesteps in the trajectory and compute the loss for each timestep
+        print('trajectory =', trajectory)
+        for time, timestep in enumerate(trajectory):
+            # calculate the reward to go for this timestep
+            reward = reward_to_go(trajectory, time, gamma)
+
+            # calculate the loss for this timestep
+            loss += tf.math.log(policy_func(timestep[1], timestep[0])) * reward
+
+
+    # average the loss over all trajectories
+    loss *= 1 / len(trajectories)  * 1 / len(trajectories[0])
+
+    return loss
 
