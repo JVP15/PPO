@@ -20,17 +20,15 @@ else:
     env = gym.make('Pendulum-v1')
 
 # sample hyperparameters
-train_iterations = 10000
-batch_size = 100
-epochs = 30
-learning_rate = 1e-2
-hidden_size = 8
-n_layers = 2
+total_timesteps = 100000
+batch_size = 10
+trajectory_length = 50
+train_iterations = total_timesteps // (batch_size * trajectory_length)
 
 # for visualization purposes, we'll use [theta, theta_dot],
 #   but the agent will learn using [cos(theta), sin(theta), theta_dot]
-agent = PPOAgent(input_size=3, output_size=1, log_std=-.5)
-agent.train(env=env, max_iterations=train_iterations)
+agent = PPOAgent(input_size=3, output_size=1, log_std=-.05, num_trajectories=batch_size, trajectory_length=trajectory_length, learning_rate=1e-3)
+agent.train(env=env, max_iterations=train_iterations, log_interval=5, eval_interval=10)
 
 # check how the agent is doing after it's done training
 test_episodes = 5

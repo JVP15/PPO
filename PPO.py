@@ -34,7 +34,7 @@ class PPOAgent(object):
                                         Dense(32, activation='tanh'),
                                         Dense(output_size, activation='tanh')])
 
-    def train(self, env, max_iterations, log_interval = 200):
+    def train(self, env, max_iterations, log_interval = 200, eval_interval = 200, eval_episodes=5):
         optimizer = tf.keras.optimizers.Adam(learning_rate=self._learning_rate)
 
         # loop over iterations
@@ -56,7 +56,11 @@ class PPOAgent(object):
             optimizer.apply_gradients(zip(gradients, self._mu.trainable_variables + self._value.trainable_variables))
 
             if iteration % log_interval == 0:
-                print("iteration: {}, loss: {}".format(iteration, loss))
+                print(f'iteration: {iteration}, loss: {loss}')
+
+            if iteration % eval_interval == 0:
+                mean_reward = self.evaluate(env, eval_episodes)
+                print(f'iteration: {iteration}, mean reward over {eval_episodes} episodes: {mean_reward}')
 
     def mu(self, state):
         # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
@@ -100,7 +104,6 @@ class PPOAgent(object):
 
         # collect all trajectories for the current iteration
         for _ in range(self._num_trajectories):
-            #print(f'Collecting trajectory {_}')
             # collect data from a single trajectory/episode
             trajectory = []
 
@@ -109,7 +112,6 @@ class PPOAgent(object):
 
             # collect the state, action, and reward of each time step for trajectory_length time steps
             for _ in range(self._trajectory_length):
-                #print(f'In timestep {_}')
                 # get the action from the agent
                 action = self.action(state)
 
@@ -119,6 +121,27 @@ class PPOAgent(object):
                 state = next_state
 
             trajectories.append(trajectory)
-        #print(trajectories[0][1])
 
         return trajectories
+
+    def evaluate(self, env, num_episodes):
+        """Evaluate the agent's performance on the environment. Returns the average return of the agent over the
+        specified number of episodes.
+        """
+        total_reward = 0.0
+
+        for _ in range(num_episodes):
+            # reset the environment
+            state = env.reset()
+
+            while True:
+                # get the action from the agent
+                action = self.action(state)
+
+                # take a step in the environment
+                state, reward, done, _ = env.step(action)
+                total_reward += reward
+                if done:
+                    break
+
+        return total_reward / num_episodes
