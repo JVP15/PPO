@@ -16,12 +16,10 @@ class NormalModule(nn.Module):
         vout = torch.exp(self.log_std)
         return mout, vout
 
-
 def reward_to_go(trajectory, time, gamma):
     """
     This calculates the reward to go for the given trajectory (a list of (s, a, r) tuples) starting at the given time
     Equivalent to R_to_go = sum t=t` to T (gamma^(t-t`) * r_t)
-
     :param trajectory: A list of (s, a, r) tuples
     :param time: The time to start calculating the reward from
     :param gamma: The discount factor
@@ -36,6 +34,22 @@ def reward_to_go(trajectory, time, gamma):
 
     #print('reward to go =', reward)
     return reward
+
+def generalized_advantage_function(rewards, values, next_values, dones, gamma=0.99, tau=0.95):
+    # GAE = R + gamma * V(s+1) - V(s)
+    deltas = []
+    gae = 0
+    for i in reversed(range(len(rewards))):
+        delta = rewards[i] + gamma * next_values[i] - values[i]
+        gae = delta + gamma * tau * dones[i] * gae
+        deltas.append(gae)
+    deltas.reverse()
+    return deltas
+
+
+def policy_gradient_clipping(policy_loss, clip_value=0.2):
+    return nn.utils.clip_grad_norm_(policy_loss, clip_value)
+
 
 def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
     """
