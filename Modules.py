@@ -46,10 +46,8 @@ def generalized_advantage_function(rewards, values, next_values, dones, gamma=0.
     deltas.reverse()
     return deltas
 
-
 def policy_gradient_clipping(policy_loss, clip_value=0.2):
     return nn.utils.clip_grad_norm_(policy_loss, clip_value)
-
 
 def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
     """
@@ -75,7 +73,6 @@ def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
 
             # calculate the loss for this timestep
             loss += tf.math.log(policy_func(timestep[1], timestep[0])) * reward
-
 
     # average the loss over all trajectories
     loss *= 1 / len(trajectories)  * 1 / len(trajectories[0])

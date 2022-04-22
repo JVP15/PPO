@@ -2,6 +2,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 from PPO import PPOAgent
+import time
 
 # Set USING_CUSTOM_ENVIRONMENT to True if you want to use the environment provided by the professor, and False
 #   if you want to use Pendulum-v1 from OpenAI Gym. I think the only difference is that Pendulum-v1 stops after 200 timesteps
@@ -20,15 +21,15 @@ else:
     env = gym.make('Pendulum-v1')
 
 # sample hyperparameters
-total_timesteps = 100000
+total_timesteps = 1000000
 batch_size = 10
-trajectory_length = 50
+trajectory_length = 100
 train_iterations = total_timesteps // (batch_size * trajectory_length)
 
 # for visualization purposes, we'll use [theta, theta_dot],
 #   but the agent will learn using [cos(theta), sin(theta), theta_dot]
 agent = PPOAgent(input_size=3, output_size=1, log_std=-.05, num_trajectories=batch_size, trajectory_length=trajectory_length, learning_rate=1e-3)
-agent.train(env=env, max_iterations=train_iterations, log_interval=5, eval_interval=10)
+agent.train(env=env, max_iterations=train_iterations, log_interval=10, eval_interval=50)
 
 # check how the agent is doing after it's done training
 test_episodes = 5

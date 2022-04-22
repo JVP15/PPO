@@ -46,7 +46,7 @@ class PPOAgent(object):
 
             # gradient tape allows us to perform automatic differentiation
             with tf.GradientTape(persistent=True) as tape:
-                loss = self._loss_function(trajectories, policy_func=self.pi, value_func=self.V, gamma=self._gamma)
+                loss = -self._loss_function(trajectories, policy_func=self.pi, value_func=self.V, gamma=self._gamma)
 
             # compute the gradients of the loss with respect to the policy and value parameters
             # if you aren't using the value function, then we ignore the gradient of the value function using the 'unconnected_gradients' argument
@@ -86,8 +86,9 @@ class PPOAgent(object):
         mu = self.mu(state)
         std = self.std(state)
 
-        # compute the probability of the action given the state
-        prob = tf.exp(-(action - mu)**2 / (2 * std**2)) / (2 * np.pi * std**2)
+        # compute the probability of the action given the state. Probability density function taken from wolfram alpha:
+        # https://reference.wolfram.com/language/ref/NormalDistribution.html
+        prob = 1 / (std * tf.sqrt(2 * np.pi)) * tf.exp(-(action - mu)**2 / (2 * std**2))
 
         return prob
 
