@@ -35,20 +35,6 @@ def reward_to_go(trajectory, time, gamma):
     #print('reward to go =', reward)
     return reward
 
-def generalized_advantage_function(rewards, values, next_values, dones, gamma=0.99, tau=0.95):
-    # GAE = R + gamma * V(s+1) - V(s)
-    deltas = []
-    gae = 0
-    for i in reversed(range(len(rewards))):
-        delta = rewards[i] + gamma * next_values[i] - values[i]
-        gae = delta + gamma * tau * dones[i] * gae
-        deltas.append(gae)
-    deltas.reverse()
-    return deltas
-
-def policy_gradient_clipping(policy_loss, clip_value=0.2):
-    return nn.utils.clip_grad_norm_(policy_loss, clip_value)
-
 def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
     """
     Computes the loss for the policy gradient algorithm with reward-to-go instead of an advantage function.
@@ -79,3 +65,26 @@ def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
 
     return loss
 
+def delta(trajectory, value_func, gamma, time):
+    return trajectory[time][2] + gamma * value_func(trajectory[time+1][0]) - value_func(trajectory[time][0])
+    # next_state = trajectory[time + 1][0]
+    # next_value = value_func(next_state)
+
+    # current_state = trajectory[time][0]
+    # current_value = value_func(current_state)
+
+    # # calculate the advantage
+    # advantage = trajectory[time][2] + gamma * next_value - current_value
+
+    # return advantage
+
+def advantage_function(trajectory, value_func, gamma, time):
+    advantage = 0
+
+    for count, timestep in enumerate(trajectory[time:]):
+        advantage += delta(trajectory, value_func, gamma, count)
+
+    return advantage
+
+def clipping(loss, clip):
+    return tf.clip_by_value(loss, -clip, clip)
