@@ -65,6 +65,15 @@ def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
 
     return loss
 
+def surrogate_loss(trajectories, policy_func, value_func, gamma):
+    # Loss = E[(V(s) - V(s+1)) * pi(a|s)]
+    loss = 0
+    for trajectory in trajectories:
+        for time, timestep in enumerate(trajectory):
+            loss += (value_func(timestep[0]) - value_func(timestep[0])) * policy_func(timestep[1], timestep[0])
+    loss *= 1 / len(trajectories) * / len(trajectories[0])
+    return loss
+
 def delta(trajectory, value_func, gamma, time):
     return trajectory[time][2] + gamma * value_func(trajectory[time+1][0]) - value_func(trajectory[time][0])
     # next_state = trajectory[time + 1][0]
