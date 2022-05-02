@@ -2,7 +2,8 @@ import gym
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import Dense
-from Modules import policy_gradient_loss
+from tf.keras.models import clone_model
+from Modules import policy_gradient_loss, surrogate_loss_clipped
 
 
 class PPOAgent(object):
@@ -13,8 +14,10 @@ class PPOAgent(object):
                  n_epochs=10,
                  learning_rate=3e-4,
                  gamma=.99,
-                 loss_function=policy_gradient_loss):
-
+                 clip_value = 0.2,
+                 loss_function=surrogate_loss_clipped):
+        # clip value
+        self._clip_value = clip_value
         self.input_size = input_size
         self.output_size = output_size
         self._log_std = log_std * np.ones(output_size)
@@ -29,6 +32,11 @@ class PPOAgent(object):
         self._mu = tf.keras.Sequential([Dense(32, input_shape=(input_size,), activation='tanh'),
                                         Dense(32, activation='tanh'),
                                         Dense(output_size, activation='tanh')])
+
+        self._mu_old = tf.keras.Sequential([Dense(32, input_shape=(input_size,), activation='tanh'),
+                                        Dense(32, activation='tanh'),
+                                        Dense(output_size, activation='tanh')])
+
         # this is the value function for the policy
         self._value = tf.keras.Sequential([Dense(32, input_shape=(input_size,), activation='tanh'),
                                         Dense(32, activation='tanh'),
@@ -46,13 +54,18 @@ class PPOAgent(object):
 
             # gradient tape allows us to perform automatic differentiation
             with tf.GradientTape(persistent=True) as tape:
-                loss = -self._loss_function(trajectories, policy_func=self.pi, value_func=self.V, gamma=self._gamma)
+                
+                # uncomment this for loss function using vanilla policy gradient, the only difference is the parameters passed.
+                # loss = -self._loss_function(trajectories, policy_func=self.pi, value_func=self.V, gamma=self._gamma)  
+                loss = -self._loss_function(trajectories, policy_func=self.pi, value_func=self.V, gamma=self._gamma, clip = self._clip_value, ratio = self.ratio)
 
             # compute the gradients of the loss with respect to the policy and value parameters
             # if you aren't using the value function, then we ignore the gradient of the value function using the 'unconnected_gradients' argument
             gradients = tape.gradient(loss, self._mu.trainable_variables + self._value.trainable_variables,
                                       unconnected_gradients=tf.UnconnectedGradients.ZERO)
-
+            
+            self._mu_old = clone_model(self._mu)
+            
             optimizer.apply_gradients(zip(gradients, self._mu.trainable_variables + self._value.trainable_variables))
 
             if iteration % log_interval == 0:
@@ -67,6 +80,11 @@ class PPOAgent(object):
         state = tf.expand_dims(state, axis=0)
         return self._mu(state)
 
+    def mu_old(self, state):
+        # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
+        state = tf.expand_dims(state, axis=0)
+        return self._mu_old(state)
+
     def V(self, state):
         # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
         state = tf.expand_dims(state, axis=0)
@@ -76,6 +94,11 @@ class PPOAgent(object):
         # In our original implementation, std is a tunable hyperparameter, but we may make it an MLP based on state, so
         #  I've added this function to future-proof the code.
         return np.exp(self._log_std)
+
+    def ratio(self, state):
+        mu_old = self.mu_old(state)
+        mu = self.mu(state)
+        return tf.exp(tf.math.log(mu) - tf.math.log(mu_old))
 
     def pi(self, action, state):
         """This is the policy pi(a|s), which computes the probability that the agent will take action a given the state s.
@@ -89,7 +112,6 @@ class PPOAgent(object):
         # compute the probability of the action given the state. Probability density function taken from wolfram alpha:
         # https://reference.wolfram.com/language/ref/NormalDistribution.html
         prob = 1 / (std * tf.sqrt(2 * np.pi)) * tf.exp(-(action - mu)**2 / (2 * std**2))
-
         return prob
 
     def action(self, state):
