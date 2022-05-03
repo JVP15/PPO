@@ -59,12 +59,13 @@ class PPOAgent(object):
                 # loss = -self._loss_function(trajectories, policy_func=self.pi, value_func=self.V, gamma=self._gamma)  
                 loss = -self._loss_function(trajectories, policy_func=self.pi, value_func=self.V, gamma=self._gamma, clip = self._clip_value, ratio = self.ratio)
 
+            mu_weights = self._mu.get_weights()
             # compute the gradients of the loss with respect to the policy and value parameters
             # if you aren't using the value function, then we ignore the gradient of the value function using the 'unconnected_gradients' argument
             gradients = tape.gradient(loss, self._mu.trainable_variables + self._value.trainable_variables,
                                       unconnected_gradients=tf.UnconnectedGradients.ZERO)
             
-            self._mu_old = clone_model(self._mu)
+            self._mu_old.set_weights(mu_weights)
             
             optimizer.apply_gradients(zip(gradients, self._mu.trainable_variables + self._value.trainable_variables))
 
@@ -98,7 +99,7 @@ class PPOAgent(object):
     def ratio(self, state):
         mu_old = self.mu_old(state)
         mu = self.mu(state)
-        return tf.exp(tf.math.log(mu) - tf.math.log(mu_old))
+        return mu / mu_old
     
     def pi(self, action, state):
         """This is the policy pi(a|s), which computes the probability that the agent will take action a given the state s.

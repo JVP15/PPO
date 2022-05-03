@@ -73,40 +73,53 @@ def surrogate_loss(trajectories, policy_func, value_func, gamma, clip, ratio):
     loss = 0
     for trajectory in trajectories:
         for time, timestep in enumerate(trajectory):
-            loss+= ratio(timestep[0]) * advantage_function(trajectory, value_func, gamma, time)
-    loss *= 1 / len(trajectories) * 1 / len(trajectory[0])
+            loss += ratio(timestep[0]) * advantage_function(trajectory, value_func, gamma, time)
+
+    loss *= 1 / len(trajectories) * 1 / len(trajectories[0])
 
     return loss
 
-def surrogate_loss_clipped(trajectories, policy_func, value_func, gamma, clip, ratio):
+def surrogate_loss_clipped(trajectories, policy_func, value_func, gamma, clip, ratio_func):
     """
     Computes the loss for the policy gradient algorithm with the generalized advantage function and clipping.
     Loss = min(ratio * A(s, a), clip(ratio) * A(s, a))
 
     :param trajectories: A list of trajectories, where each element of each trajectory is (s, a, r)
     :param clip: The clipping parameter.
-    :param ratio: The ratio between the two policies.
+    :param ratio_func: The ratio function function for the current and old policies.
     :param value_func: The value function V(s))
     :return: The loss for the policy gradient with clipping algorithm.
     """
     loss = 0
     for trajectory in trajectories:
         for time, timestep in enumerate(trajectory):
-            
-            loss1= clip_by_value(ratio(timestep[0]),1-clip,1+clip) * advantage_function(trajectory, value_func, gamma, time)    
-            loss2= ratio(timestep[0]) * advantage_function(trajectory, value_func, gamma, time)
-            loss+= tf.minimum(loss1,loss2)
 
-    loss *= 1 / len(trajectories) * 1 / len(trajectory[0])
+            ratio = ratio_func(timestep[0])
+            A = advantage_function(trajectory, value_func, gamma, time)
+            loss1= clip(ratio, A) * A
+            loss2= ratio * A
+            loss += tf.minimum(loss1,loss2)
+
+    loss *= 1 / len(trajectories) * 1 / len(trajectories[0])
     return loss
 
-def delta(trajectory, value_func, gamma, time):
-    return trajectory[time][2] + gamma * value_func(trajectory[time+1][0]) - value_func(trajectory[time][0])
+def clip(x, advantage, epsilon = .2):
+    # the value is clipped at 1-epsilon if the advantage is negative and 1+epsilon if the advantage is positive
+    if advantage > 0:
+        return tf.clip_by_value(x, x, 1 + epsilon)
+    else:
+        return tf.clip_by_value(x, 1 - epsilon, x)
+
+def delta(r, v, gamma, time):
+    return r + gamma * v[time + 1] - v[time]
 
 def advantage_function(trajectory, value_func, gamma, time):
     advantage = 0
+    # pre-calculate the value function for each state in the timestep so that we don't have to do it multiple times
+    values = np.array([value_func(timestep[0]) for timestep in trajectory], dtype=np.float32)
 
     for count, timestep in enumerate(trajectory[time:-1]):
-        advantage += delta(trajectory, value_func, gamma, count)
+        reward = timestep[2]
+        advantage += delta(reward, values, gamma, count)
 
     return advantage
