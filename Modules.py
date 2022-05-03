@@ -1,21 +1,21 @@
 import numpy as np
-import torch
-import torch.nn as nn
+# import torch
+# import torch.nn as nn
 import tensorflow as tf
-from tf import clip_by_value
+from tensorflow import clip_by_value
 
-class NormalModule(nn.Module):
-    def __init__(self, inp, out, activation=nn.Tanh):
-        super().__init__()
-        self.m = nn.Linear(inp, out)
-        log_std = -0.5 * np.ones(out, dtype=np.float32)
-        self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
-        self.act1 = activation
+# class NormalModule(nn.Module):
+#     def __init__(self, inp, out, activation=nn.Tanh):
+#         super().__init__()
+#         self.m = nn.Linear(inp, out)
+#         log_std = -0.5 * np.ones(out, dtype=np.float32)
+#         self.log_std = torch.nn.Parameter(torch.as_tensor(log_std))
+#         self.act1 = activation
 
-    def forward(self, inputs):
-        mout = self.m(inputs)
-        vout = torch.exp(self.log_std)
-        return mout, vout
+#     def forward(self, inputs):
+#         mout = self.m(inputs)
+#         vout = torch.exp(self.log_std)
+#         return mout, vout
 
 def reward_to_go(trajectory, time, gamma):
     """
@@ -69,6 +69,15 @@ def policy_gradient_loss(trajectories, policy_func, value_func, gamma):
 
     return loss
 
+def surrogate_loss(trajectories, policy_func, value_func, gamma, clip, ratio):
+    loss = 0
+    for trajectory in trajectories:
+        for time, timestep in enumerate(trajectory):
+            loss+= ratio(timestep[0]) * advantage_function(trajectory, value_func, gamma, time)
+    loss *= 1 / len(trajectories) * 1 / len(trajectory[0])
+
+    return loss
+
 def surrogate_loss_clipped(trajectories, policy_func, value_func, gamma, clip, ratio):
     """
     Computes the loss for the policy gradient algorithm with the generalized advantage function and clipping.
@@ -80,14 +89,13 @@ def surrogate_loss_clipped(trajectories, policy_func, value_func, gamma, clip, r
     :param value_func: The value function V(s))
     :return: The loss for the policy gradient with clipping algorithm.
     """
-
     loss = 0
     for trajectory in trajectories:
         for time, timestep in enumerate(trajectory):
             
-            loss1= clipping(ratio,clip) * advantage_function(trajectory, value_func, gamma, time)    
-            loss2= ratio * advantage_function(trajectory, value_func, gamma, time)
-            loss+= min(loss1, loss2)
+            loss1= clip_by_value(ratio(timestep[0]),1-clip,1+clip) * advantage_function(trajectory, value_func, gamma, time)    
+            loss2= ratio(timestep[0]) * advantage_function(trajectory, value_func, gamma, time)
+            loss+= tf.minimum(loss1,loss2)
 
     loss *= 1 / len(trajectories) * 1 / len(trajectory[0])
     return loss
@@ -102,10 +110,3 @@ def advantage_function(trajectory, value_func, gamma, time):
         advantage += delta(trajectory, value_func, gamma, count)
 
     return advantage
-
-def clipping(loss, clip):
-    if loss>0:
-        loss = clip_by_value(loss, 0, clip)
-    else:
-        loss = clip_by_value(loss, -clip, 0)
-    return loss

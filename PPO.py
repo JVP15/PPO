@@ -2,8 +2,8 @@ import gym
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import Dense
-from tf.keras.models import clone_model
-from Modules import policy_gradient_loss, surrogate_loss_clipped
+from tensorflow.keras.models import clone_model
+from Modules import policy_gradient_loss, surrogate_loss_clipped, surrogate_loss
 
 
 class PPOAgent(object):
@@ -15,7 +15,7 @@ class PPOAgent(object):
                  learning_rate=3e-4,
                  gamma=.99,
                  clip_value = 0.2,
-                 loss_function=surrogate_loss_clipped):
+                 loss_function=surrogate_loss):
         # clip value
         self._clip_value = clip_value
         self.input_size = input_size
@@ -27,7 +27,7 @@ class PPOAgent(object):
         self._learning_rate = learning_rate
         self._gamma = gamma
         self._loss_function = loss_function
-
+    
         # mu is an MLP takes the state as input and outputs the mean of the action
         self._mu = tf.keras.Sequential([Dense(32, input_shape=(input_size,), activation='tanh'),
                                         Dense(32, activation='tanh'),
@@ -99,7 +99,7 @@ class PPOAgent(object):
         mu_old = self.mu_old(state)
         mu = self.mu(state)
         return tf.exp(tf.math.log(mu) - tf.math.log(mu_old))
-
+    
     def pi(self, action, state):
         """This is the policy pi(a|s), which computes the probability that the agent will take action a given the state s.
         """
