@@ -44,14 +44,13 @@ def advantage_function(trajectory, value_func, gamma, time):
 
     return advantage
 
-def policy_gradient_loss(trajectories, policy_func, value_func, gamma, **kwargs):
+def policy_gradient_loss(trajectories, policy_func, gamma, **kwargs):
     """
     Computes the loss for the policy gradient algorithm with reward-to-go instead of an advantage function.
     Loss = E[log(pi(a|s)) * (R_to_go)]
 
     :param trajectories: A list of trajectories, where each element of each trajectory is (s, a, r)
     :param policy_func: The policy function pi(a|s).
-    :param value_func: The value function V(s) (not actually used in this function, but here to match the signature)
     :param gamma: The discount factor.
     :return: The loss for the policy gradient algorithm.
     """
@@ -75,7 +74,48 @@ def policy_gradient_loss(trajectories, policy_func, value_func, gamma, **kwargs)
 
     return loss
 
-def surrogate_loss(trajectories, policy_func, value_func, gamma, clip, ratio_func):
+def policy_gradient_loss_advantage(trajectories, policy_func, value_func, gamma, **kwargs):
+    """
+    Computes the loss for the policy gradient algorithm with the advantage function.
+    Loss = E[log(pi(a|s)) * A_t]
+
+    :param trajectories: A list of trajectories, where each element of each trajectory is (s, a, r)
+    :param policy_func: The policy function pi(a|s).
+    :param value_func: The value function V(s)
+    :param gamma: The discount factor.
+    :return: The loss for the policy gradient algorithm.
+    """
+
+    loss = 0
+
+    # loop over all trajectories in the batch
+    for trajectory in trajectories:
+        # loop over all timesteps in the trajectory and compute the loss for each timestep
+        # print('trajectory =', trajectory)
+        for time, timestep in enumerate(trajectory):
+            # calculate the reward to go for this timestep
+            advantage = advantage_function(trajectory, value_func, time, gamma)
+            state = timestep[0]
+            action = timestep[1]
+            # calculate the loss for this timestep
+            loss += tf.math.log(policy_func(action, state)) * advantage
+
+    # average the loss over all trajectories
+    # loss *= 1 / len(trajectories)  * 1 / len(trajectories[0])
+
+    return loss
+
+def surrogate_loss(trajectories, ratio_func, value_func, gamma, **kwargs):
+    """
+    Computes the loss for the surrogate policy gradient algorithm.
+    Loss = E[ratio * A_t]
+    :param trajectories: A list of trajectories, where each element of each trajectory is (s, a, r)
+    :param ratio_func: The ratio function r(a|s) = pi(a|s) / pi_old(a|s)
+    :param policy_func: The policy function pi(a|s).
+    :param value_func: The value function V(s)
+    :param gamma: The discount factor.
+    :return: The loss for the policy gradient algorithm.
+    """
     loss = 0
     for trajectory in trajectories:
         for time, timestep in enumerate(trajectory):
@@ -85,7 +125,7 @@ def surrogate_loss(trajectories, policy_func, value_func, gamma, clip, ratio_fun
 
     return loss
 
-def surrogate_loss_clipped(trajectories, policy_func, value_func, gamma, clip_value, ratio_func):
+def surrogate_loss_clipped(trajectories,value_func, gamma, clip_value, ratio_func, **kwargs):
     """
     Computes the loss for the policy gradient algorithm with the generalized advantage function and clipping.
     Loss = min(ratio * A(s, a), clip(ratio) * A(s, a))
@@ -93,7 +133,7 @@ def surrogate_loss_clipped(trajectories, policy_func, value_func, gamma, clip_va
     :param trajectories: A list of trajectories, where each element of each trajectory is (s, a, r)
     :param clip_value: The clipping parameter.
     :param ratio_func: The ratio function for the current and old policies.
-    :param value_func: The value function V(s))
+    :param value_func: The value function V(s)
     :return: The loss for the policy gradient with clipping algorithm.
     """
     loss = 0

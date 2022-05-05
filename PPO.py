@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import clone_model
-from Modules import policy_gradient_loss, surrogate_loss_clipped, surrogate_loss, value_loss, reward_to_go
+from Modules import policy_gradient_loss, value_loss, reward_to_go
 import matplotlib.pyplot as plt
 
 
