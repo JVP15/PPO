@@ -48,7 +48,7 @@ class PPOAgent(object):
                                         Dense(output_size, activation='tanh')])
 
 
-    def train(self, env, max_iterations, log_interval = 200, eval_interval = 200, eval_episodes=5):
+    def train(self, env, max_iterations, log_interval = 200):
         optimizer = tf.keras.optimizers.Adam(learning_rate=self._learning_rate)
 
         # loop over iterations
@@ -70,7 +70,7 @@ class PPOAgent(object):
                 # for some reason, we need to negate the total loss for TF's ADAM to work properly
                 total_loss = -(actor_loss - value_loss)
 
-            self.losses.append(-total_loss.numpy())
+            self.losses.append(-total_loss.numpy()[0,0])
 
             mu_weights = self._mu.get_weights()
             # compute the gradients of the loss with respect to the policy and value parameters
@@ -85,7 +85,7 @@ class PPOAgent(object):
             optimizer.apply_gradients(zip(value_gradients, self._value.trainable_variables))
 
             if iteration % log_interval == 0:
-                print(f'iteration: {iteration}, loss: {total_loss}')
+                #print(f'iteration: {iteration}, loss: {total_loss}')
 
                 # sample 16x16 evenly distributed points in the state space to visualize the value function
                 theta = np.linspace(-np.pi, np.pi, 16)
@@ -95,23 +95,21 @@ class PPOAgent(object):
 
                 value_grid = np.array([self.V(state) for state in state_grid.reshape((16**2, 3))])
                 value_grid = value_grid.reshape(theta_grid.shape)
-                print(value_grid.shape)
+
 
                 plt.imshow(value_grid, extent=[-np.pi, np.pi, -8, 8], origin='lower', aspect='auto')
-                plt.title('Value Function')
+                plt.title(f'Value Function at iteration {iteration}')
                 plt.xlabel('Theta')
                 plt.ylabel('Angular Velocity')
                 plt.show()
 
-    def mu(self, state):
+    def mu(self, state, old=False):
         # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
         state = tf.expand_dims(state, axis=0)
-        return self._mu(state)
-
-    def mu_old(self, state):
-        # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
-        state = tf.expand_dims(state, axis=0)
-        return self._mu_old(state)
+        if old:
+            return self._mu_old(state)
+        else:
+            return self._mu(state)
 
     def V(self, state):
         # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
@@ -123,17 +121,17 @@ class PPOAgent(object):
         #  I've added this function to future-proof the code.
         return np.exp(self._log_std)
 
-    def ratio(self, state):
-        mu_old = self.mu_old(state)
-        mu = self.mu(state)
-        return mu / mu_old
+    def ratio(self, action, state):
+        """This is the ration function r(a|s) = pi(a|s) / pi_old(a|s)"""
+        pi_old = self.pi(action, state, old=True)
+        pi = self.pi(action, state)
+        return pi / pi_old
     
-    def pi(self, action, state):
+    def pi(self, action, state, old=False):
         """This is the policy pi(a|s), which computes the probability that the agent will take action a given the state s.
         """
         # since we sample from a gaussian distribution to get the action, we can use the gauusian pdf to compute the
         #   probability of the action.
-
         mu = self.mu(state)
         std = self.std(state)
 

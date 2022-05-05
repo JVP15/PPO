@@ -111,7 +111,6 @@ def surrogate_loss(trajectories, ratio_func, value_func, gamma, **kwargs):
     Loss = E[ratio * A_t]
     :param trajectories: A list of trajectories, where each element of each trajectory is (s, a, r)
     :param ratio_func: The ratio function r(a|s) = pi(a|s) / pi_old(a|s)
-    :param policy_func: The policy function pi(a|s).
     :param value_func: The value function V(s)
     :param gamma: The discount factor.
     :return: The loss for the policy gradient algorithm.
@@ -119,7 +118,9 @@ def surrogate_loss(trajectories, ratio_func, value_func, gamma, **kwargs):
     loss = 0
     for trajectory in trajectories:
         for time, timestep in enumerate(trajectory):
-            loss += ratio_func(timestep[0]) * advantage_function(trajectory, value_func, gamma, time)
+            state = timestep[0]
+            action = timestep[1]
+            loss += ratio_func(action, state) * advantage_function(trajectory, value_func, gamma, time)
 
     #loss *= 1 / len(trajectories) * 1 / len(trajectories[0])
 
@@ -132,15 +133,17 @@ def surrogate_loss_clipped(trajectories,value_func, gamma, clip_value, ratio_fun
 
     :param trajectories: A list of trajectories, where each element of each trajectory is (s, a, r)
     :param clip_value: The clipping parameter.
-    :param ratio_func: The ratio function for the current and old policies.
+    :param ratio_func: The ratio function r(a|s) = pi(a|s) / pi_old(a|s)
     :param value_func: The value function V(s)
     :return: The loss for the policy gradient with clipping algorithm.
     """
     loss = 0
     for trajectory in trajectories:
         for time, timestep in enumerate(trajectory):
+            state = timestep[0]
+            action = timestep[1]
 
-            ratio = ratio_func(timestep[0])
+            ratio = ratio_func(action, state)
             A = advantage_function(trajectory, value_func, gamma, time)
             loss1= clip(ratio, A, clip_value) * A
             loss2= ratio * A
