@@ -45,7 +45,7 @@ class PPOAgent(object):
         # this is the value function for the policy
         self._value = tf.keras.Sequential([Dense(32, input_shape=(input_size,), activation='tanh'),
                                         Dense(32, activation='tanh'),
-                                        Dense(output_size, activation='tanh')])
+                                        Dense(1, activation='tanh')])
 
 
     def train(self, env, max_iterations, log_interval = 200):
@@ -68,20 +68,20 @@ class PPOAgent(object):
                 actor_loss = self._actor_loss_function(trajectories, policy_func=self.pi, value_func=self.V, gamma=self._gamma, clip_value=self._clip_value, ratio_func = self.ratio)
                 value_loss = self._value_loss_function(trajectories, value_func=self.V, gamma=self._gamma)
 
-                # for some reason, we need to negate the total loss for TF's ADAM to work properly
-                total_loss = -(actor_loss - value_loss)
+                total_loss = actor_loss - value_loss
 
             self.losses.append(-total_loss.numpy()[0,0])
 
             mu_weights = self._mu.get_weights()
             # compute the gradients of the loss with respect to the policy and value parameters
             # if you aren't using the value function, then we ignore the gradient of the value function using the 'unconnected_gradients' argument
+            # for some reason, we need to negate the total loss for TF's ADAM to work properly on the actor network, but not the critic
             mu_gradients = tape.gradient(total_loss, self._mu.trainable_variables)
             value_gradients = tape.gradient(total_loss, self._value.trainable_variables, unconnected_gradients=tf.UnconnectedGradients.ZERO)
 
             # save the current mu network before we update it with the gradients
             self._mu_old.set_weights(mu_weights)
-            
+
             optimizer.apply_gradients(zip(mu_gradients, self._mu.trainable_variables))
             optimizer.apply_gradients(zip(value_gradients, self._value.trainable_variables))
 
@@ -102,10 +102,14 @@ class PPOAgent(object):
         else:
             return self._mu(state)
 
-    def V(self, state):
-        # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
-        state = tf.expand_dims(state, axis=0)
-        return self._value(state)
+    def V(self, state, batch=False):
+        if batch == False:
+            # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
+            state = tf.expand_dims(state, axis=0)
+            return self._value(state)
+        else: # this works when we have a batch of states as input
+            return self._value.predict(state)
+
 
     def std(self, state = None):
         # In our original implementation, std is a tunable hyperparameter, but we may make it an MLP based on state, so
@@ -160,6 +164,11 @@ class PPOAgent(object):
                 # take a step in the environment
                 next_state, reward, done, _ = env.step(action)
                 # trajectory.append(np.concatenate([np.array(state).flatten(), action[0], reward]))
+                # convert state, action, and reward to tensors (for TF gradient to work) and flatten them
+                state = tf.reshape(tf.convert_to_tensor(state), -1)
+                action = tf.reshape(action, -1) # action is already a tensor, but we still want to flatten it
+                reward = tf.reshape(tf.convert_to_tensor(reward), -1)
+
                 trajectory.append((state, action, reward))
 
                 state = next_state
@@ -176,8 +185,8 @@ class PPOAgent(object):
         state_grid = np.stack([np.cos(theta_grid), np.sin(theta_grid), theta_dot_grid], axis=-1)
 
         value_grid = np.array([self.V(state) for state in state_grid.reshape((16 ** 2, 3))])
-        value_grid = value_grid.reshape(theta_grid.shape)
 
+        value_grid = value_grid.reshape(theta_grid.shape)
         plt.imshow(value_grid, extent=[-np.pi, np.pi, -8, 8], origin='lower', aspect='auto')
         plt.colorbar()
         title = 'Value Function' if iteration is None else f'Value Function at iteration {iteration}'
@@ -185,6 +194,8 @@ class PPOAgent(object):
         plt.xlabel('Theta')
         plt.ylabel('Angular Velocity')
         plt.show()
+
+
     def evaluate(self, env, num_episodes):
         """Evaluate the agent's performance on the environment. Returns the average return of the agent over the
         specified number of episodes.

@@ -36,7 +36,7 @@ def delta(r, v, gamma, time):
 def advantage_function(trajectory, value_func, gamma, time):
     advantage = 0
     # pre-calculate the value function for each state in the timestep so that we don't have to do it multiple times
-    values = np.array([value_func(timestep[0]) for timestep in trajectory], dtype=np.float32)
+    values = value_func(tf.convert_to_tensor([value_func(timestep[0]) for timestep in trajectory]), batch=True)
 
     for count, timestep in enumerate(trajectory[time:-1]):
         reward = timestep[2]
@@ -69,8 +69,8 @@ def policy_gradient_loss(trajectories, policy_func, gamma, **kwargs):
             # calculate the loss for this timestep
             loss += tf.math.log(policy_func(action, state)) * reward
 
-    # average the loss over all trajectories
-    # loss *= 1 / len(trajectories)  * 1 / len(trajectories[0])
+    # normalize the loss
+    loss *= 1 / len(trajectories) * 1 / len(trajectories[0])
 
     return loss
 
@@ -100,8 +100,8 @@ def policy_gradient_loss_advantage(trajectories, policy_func, value_func, gamma,
             # calculate the loss for this timestep
             loss += tf.math.log(policy_func(action, state)) * advantage
 
-    # average the loss over all trajectories
-    # loss *= 1 / len(trajectories)  * 1 / len(trajectories[0])
+    # normalize the loss
+    loss *= 1 / len(trajectories) * 1 / len(trajectories[0])
 
     return loss
 
@@ -122,7 +122,8 @@ def surrogate_loss(trajectories, ratio_func, value_func, gamma, **kwargs):
             action = timestep[1]
             loss += ratio_func(action, state) * advantage_function(trajectory, value_func, gamma, time)
 
-    #loss *= 1 / len(trajectories) * 1 / len(trajectories[0])
+    # normalize the loss
+    loss *= 1 / len(trajectories) * 1 / len(trajectories[0])
 
     return loss
 
@@ -149,7 +150,9 @@ def surrogate_loss_clipped(trajectories,value_func, gamma, clip_value, ratio_fun
             loss2= ratio * A
             loss += tf.minimum(loss1,loss2)
 
-    # loss *= 1 / len(trajectories) * 1 / len(trajectories[0])
+    # normalize the loss
+    loss *= 1 / len(trajectories) * 1 / len(trajectories[0])
+
     return loss
 
 def value_loss(trajectories, value_func, gamma):
