@@ -96,8 +96,8 @@ class PPOAgent(object):
                 value_grid = np.array([self.V(state) for state in state_grid.reshape((16**2, 3))])
                 value_grid = value_grid.reshape(theta_grid.shape)
 
-
                 plt.imshow(value_grid, extent=[-np.pi, np.pi, -8, 8], origin='lower', aspect='auto')
+
                 plt.title(f'Value Function at iteration {iteration}')
                 plt.xlabel('Theta')
                 plt.ylabel('Angular Velocity')
