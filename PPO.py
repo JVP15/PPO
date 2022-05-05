@@ -53,6 +53,7 @@ class PPOAgent(object):
 
         # loop over iterations
         for iteration in range(max_iterations):
+            print(f'\rIteration {iteration}/{max_iterations}', end='')
             # this is the 'replay buffer' from the README. It is a collection of trajectories. Each trajectory
             #   is a list of (state_t, action_t, reward_t) tuples where t is the time step.
             # e.g., trajectories[0][2] will return the state, action, and reward at time step 2 in trajectory 0.
@@ -85,6 +86,7 @@ class PPOAgent(object):
             optimizer.apply_gradients(zip(value_gradients, self._value.trainable_variables))
 
             if iteration % log_interval == 0:
+                print()
                 #print(f'iteration: {iteration}, loss: {total_loss}')
 
                 # sample 16x16 evenly distributed points in the state space to visualize the value function
