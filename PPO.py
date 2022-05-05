@@ -88,22 +88,11 @@ class PPOAgent(object):
             if iteration % log_interval == 0:
                 print()
                 #print(f'iteration: {iteration}, loss: {total_loss}')
+                self.visualize_loss_function(iteration=iteration)
+                print() # add a bit of a buffer before and after the image to make it look nicer
 
-                # sample 16x16 evenly distributed points in the state space to visualize the value function
-                theta = np.linspace(-np.pi, np.pi, 16)
-                theta_dot = np.linspace(-8, 8, 16)
-                theta_grid, theta_dot_grid = np.meshgrid(theta, theta_dot)
-                state_grid = np.stack([np.cos(theta_grid), np.sin(theta_grid), theta_dot_grid], axis=-1)
-
-                value_grid = np.array([self.V(state) for state in state_grid.reshape((16**2, 3))])
-                value_grid = value_grid.reshape(theta_grid.shape)
-
-                plt.imshow(value_grid, extent=[-np.pi, np.pi, -8, 8], origin='lower', aspect='auto')
-
-                plt.title(f'Value Function at iteration {iteration}')
-                plt.xlabel('Theta')
-                plt.ylabel('Angular Velocity')
-                plt.show()
+        # at the end of training, visualize the loss function
+        self.visualize_loss_function(iteration=max_iterations)
 
     def mu(self, state, old=False):
         # tensorflow models expect inputs to be in the form of a batch of examples, so we have to add a batch dimension before calling the model
@@ -179,6 +168,23 @@ class PPOAgent(object):
 
         return trajectories
 
+    def visualize_loss_function(self, iteration=None):
+        # sample 16x16 evenly distributed points in the state space to visualize the value function
+        theta = np.linspace(-np.pi, np.pi, 16)
+        theta_dot = np.linspace(-8, 8, 16)
+        theta_grid, theta_dot_grid = np.meshgrid(theta, theta_dot)
+        state_grid = np.stack([np.cos(theta_grid), np.sin(theta_grid), theta_dot_grid], axis=-1)
+
+        value_grid = np.array([self.V(state) for state in state_grid.reshape((16 ** 2, 3))])
+        value_grid = value_grid.reshape(theta_grid.shape)
+
+        plt.imshow(value_grid, extent=[-np.pi, np.pi, -8, 8], origin='lower', aspect='auto')
+        plt.colorbar()
+        title = 'Value Function' if iteration is None else f'Value Function at iteration {iteration}'
+        plt.title(title)
+        plt.xlabel('Theta')
+        plt.ylabel('Angular Velocity')
+        plt.show()
     def evaluate(self, env, num_episodes):
         """Evaluate the agent's performance on the environment. Returns the average return of the agent over the
         specified number of episodes.
